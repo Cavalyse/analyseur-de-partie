@@ -12,6 +12,8 @@ Site web qui analyse les parties d'échecs jouées sur **Chess.com**, avec le mo
 - Meilleur coup proposé (flèche sur l'échiquier + variante principale).
 - Barre et courbe d'évaluation cliquable, navigation au clavier (← → ↑ ↓, `F` pour retourner l'échiquier).
 - Profondeur d'analyse réglable, interface sombre façon Chess.com, adaptée au mobile.
+- Rubrique « Bug ou idée ? » : les visiteurs envoient leurs demandes, qui arrivent dans les
+  [Issues GitHub](https://github.com/Cavalyse/analyseur-de-partie/issues) du projet.
 
 ## Lancer le site en local
 
@@ -41,6 +43,8 @@ Avec GitHub Pages : *Settings → Pages → Deploy from a branch*, choisir la br
 | `js/analysis.js` | Pourcentage de gain, classification des coups, précision |
 | `js/board.js` | Dessin de l'échiquier et des flèches |
 | `js/graph.js` | Courbe d'évaluation |
+| `js/feedback.js` | Rubrique « Bug ou idée ? » (prépare une issue GitHub) |
+| `.github/ISSUE_TEMPLATE/` | Formulaires de demande sur GitHub |
 | `js/vendor/chess.js` | [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (règles du jeu, lecture des PGN) |
 | `engine/` | [Stockfish.js](https://github.com/nmrugg/stockfish.js) 19 « lite single-threaded » |
 

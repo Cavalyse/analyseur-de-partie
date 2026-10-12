@@ -1,6 +1,7 @@
 import { Chess } from './vendor/chess.js';
 import { Board } from './board.js';
 import { Engine } from './engine.js';
+import { initFeedback } from './feedback.js';
 import { EvalGraph } from './graph.js';
 import {
   CLASSIFICATIONS, classBadge, classifyMove, formatEval, gameAccuracy, isBrilliant, toWhitePov, whiteWinPercent,
@@ -163,7 +164,7 @@ function loadGame(pgn, { chesscom = null, flipped = false }) {
     };
   });
 
-  state.game = { headers: chess.getHeaders(), chesscom, positions, moves };
+  state.game = { headers: chess.getHeaders(), chesscom, positions, moves, pgn };
   state.flipped = flipped;
   state.ply = 0;
 
@@ -403,12 +404,21 @@ function render() {
   const cur = $(`#moves .move[data-index="${state.ply - 1}"]`);
   if (cur) {
     cur.classList.add('current');
-    cur.scrollIntoView({ block: 'nearest' });
+    scrollMoveListTo(cur);
   }
 
   graph.render(positions, moves, state.ply);
   renderSummary();
   renderComment();
+}
+
+/** Fait défiler uniquement la liste des coups (scrollIntoView ferait aussi défiler la page). */
+function scrollMoveListTo(cell) {
+  const list = $('#moves');
+  const box = list.getBoundingClientRect();
+  const r = cell.getBoundingClientRect();
+  if (r.top < box.top) list.scrollTop -= box.top - r.top + 4;
+  else if (r.bottom > box.bottom) list.scrollTop += r.bottom - box.bottom + 4;
 }
 
 function goTo(ply) {
@@ -430,6 +440,7 @@ document.querySelectorAll('[data-nav]').forEach((btn) => {
 
 document.addEventListener('keydown', (e) => {
   if (!state.game || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+  if ($('#feedback-dialog').open) return;
   if (e.key === 'ArrowLeft') goTo(state.ply - 1);
   else if (e.key === 'ArrowRight') goTo(state.ply + 1);
   else if (e.key === 'Home' || e.key === 'ArrowUp') goTo(0);
@@ -440,6 +451,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- Démarrage ---------- */
+
+initFeedback(() => {
+  if (!state.game) return null;
+  const { headers, chesscom, moves, pgn } = state.game;
+  const move = moves[state.ply - 1];
+  return {
+    url: chesscom?.url || headers.Link || null,
+    players: `${headers.White || '?'} – ${headers.Black || '?'}`,
+    move: move ? `${Math.ceil(state.ply / 2)}${move.color === 'w' ? '.' : '…'} ${move.san}` : 'position de départ',
+    depth: $('#depth').value,
+    pgn,
+  };
+});
 
 const saved = storage('username');
 if (saved) $('#username').value = saved;

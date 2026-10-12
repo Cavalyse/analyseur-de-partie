@@ -13,6 +13,7 @@
   <header class="site-header">
     <h1>♞ Analyseur d'échecs</h1>
     <p>Analyse tes parties Chess.com avec Stockfish, directement dans ton navigateur.</p>
+    <button type="button" class="feedback-btn" data-open-feedback>💬 Bug ou idée ?</button>
   </header>
 
   <main class="layout">
@@ -89,7 +90,34 @@
     </section>
   </main>
 
+  <dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="feedback-heading">
+    <form id="feedback-form">
+      <h2 id="feedback-heading">Bug ou idée ?</h2>
+      <p class="muted small">Signale un problème ou propose une amélioration : ta demande est publiée sur la page GitHub
+        du projet, où tu pourras suivre sa prise en compte.</p>
+      <div class="feedback-types">
+        <label><input type="radio" name="type" value="bug" checked> 🐞 Signaler un bug</label>
+        <label><input type="radio" name="type" value="idea"> 💡 Proposer une idée</label>
+      </div>
+      <label class="field">Titre
+        <input id="feedback-title" name="title" type="text" maxlength="120" required placeholder="Ex. : la flèche du meilleur coup ne s'affiche pas">
+      </label>
+      <label class="field">Description
+        <textarea name="description" rows="6" required placeholder="Que s'est-il passé ? Qu'attendais-tu ? Comment reproduire le problème ?"></textarea>
+      </label>
+      <label class="checkbox"><input id="feedback-attach" type="checkbox"> Joindre les infos de la partie affichée</label>
+      <p class="muted small">Un compte GitHub (gratuit) est nécessaire pour valider l'envoi. La demande sera visible publiquement.</p>
+      <div class="dialog-actions">
+        <a id="feedback-issues" href="#" target="_blank" rel="noopener">Voir les demandes en cours</a>
+        <span class="spacer"></span>
+        <button type="button" id="feedback-cancel" class="secondary">Annuler</button>
+        <button type="submit">Continuer sur GitHub</button>
+      </div>
+    </form>
+  </dialog>
+
   <footer class="site-footer">
+    <p><button type="button" class="link-btn" data-open-feedback>Signaler un bug ou proposer une idée</button></p>
     Données : <a href="https://www.chess.com/news/view/published-data-api" target="_blank" rel="noopener">API publique Chess.com</a> ·
     Moteur : <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">Stockfish.js</a> (GPLv3) ·
     Pièces : cburnett (CC BY-SA 3.0)

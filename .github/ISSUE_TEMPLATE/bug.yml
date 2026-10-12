@@ -1,0 +1,30 @@
+name: 🐞 Signaler un bug
+description: Quelque chose ne fonctionne pas comme prévu sur le site.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du problème
+      description: Que s'est-il passé ? Qu'attendais-tu à la place ?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Comment reproduire le problème
+      placeholder: |
+        1. Rechercher le joueur « … »
+        2. Cliquer sur la partie du …
+        3. Aller au coup 12
+  - type: input
+    id: game
+    attributes:
+      label: Lien de la partie Chess.com (si utile)
+      placeholder: https://www.chess.com/game/live/...
+  - type: input
+    id: browser
+    attributes:
+      label: Navigateur et appareil
+      placeholder: Ex. Chrome sur Windows, Safari sur iPhone
