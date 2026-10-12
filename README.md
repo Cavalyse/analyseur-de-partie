@@ -6,11 +6,12 @@ Site web qui analyse les parties d'échecs jouées sur **Chess.com**, avec le mo
 
 - Recherche des parties d'un joueur via son pseudo Chess.com (mois par mois), ou collage d'un PGN.
 - Analyse coup par coup avec Stockfish 19 (version WebAssembly « lite », sans serveur).
-- Classification des coups : meilleur coup ★, excellent, bon, imprécision ?!, erreur ?, gaffe ??.
+- Classification des coups, avec les couleurs et icônes de la revue de partie Chess.com : brillant !!, meilleur coup ★,
+  excellent, bon, imprécision ?!, erreur ?, gaffe ??. L'icône s'affiche sur l'échiquier, sur la case d'arrivée du coup.
 - Précision de chaque joueur (formule de type Lichess) et, si disponible, la précision Chess.com.
 - Meilleur coup proposé (flèche sur l'échiquier + variante principale).
 - Barre et courbe d'évaluation cliquable, navigation au clavier (← → ↑ ↓, `F` pour retourner l'échiquier).
-- Profondeur d'analyse réglable, interface adaptée au mobile, thème sombre automatique.
+- Profondeur d'analyse réglable, interface sombre façon Chess.com, adaptée au mobile.
 
 ## Lancer le site en local
 
@@ -32,7 +33,7 @@ Avec GitHub Pages : *Settings → Pages → Deploy from a branch*, choisir la br
 | Fichier | Rôle |
 | --- | --- |
 | `index.html` | Structure de la page |
-| `css/style.css` | Mise en page et thème |
+| `css/style.css` | Mise en page et thème (palette inspirée de Chess.com) |
 | `css/pieces.css` | Images des pièces (SVG intégrés) |
 | `js/app.js` | Logique de l'interface : recherche, chargement d'une partie, boucle d'analyse, affichage |
 | `js/chesscom.js` | Appels à l'API publique Chess.com |
@@ -57,6 +58,9 @@ probabilité de gain (0–100 %). La perte de probabilité causée par un coup d
 | < 20 % | Erreur |
 | ≥ 20 % | Gaffe |
 
+Un coup est **brillant** s'il est le meilleur (ou excellent), que la pièce jouée est sacrifiée (l'adversaire la prend et
+garde au moins 2 pions d'avance en matériel dans la meilleure suite) et que la position reste bonne pour le joueur.
+
 La précision d'un coup vaut `103,1668 × e^(−0,04354 × perte) − 3,1669` (formule publiée par Lichess). Les chiffres
 peuvent donc différer légèrement de ceux de Chess.com, dont la méthode n'est pas publique.
 
@@ -65,3 +69,4 @@ peuvent donc différer légèrement de ceux de Chess.com, dont la méthode n'est
 - Stockfish est distribué sous licence GPLv3 (`engine/COPYING-stockfish.txt`).
 - chess.js est sous licence BSD-2 (`js/vendor/chess.js.LICENSE`).
 - Pièces « cburnett » par Colin M.L. Burnett, sous licence CC BY-SA 3.0.
+- Icônes étoile, pouce et coche : Material Icons (Google), licence Apache 2.0.
