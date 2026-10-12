@@ -1,4 +1,5 @@
-// Affichage de l'échiquier (lecture seule) avec surlignage du dernier coup et flèche du meilleur coup.
+// Affichage de l'échiquier (lecture seule) : surlignage du dernier coup, icône de classification
+// sur la case d'arrivée et flèche du meilleur coup.
 
 const FILES = 'abcdefgh';
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -31,7 +32,9 @@ export class Board {
     this.svg.classList.add('arrows');
     this.svg.innerHTML = `<defs><marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5"
       markerWidth="3" markerHeight="3" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>`;
-    this.el.append(this.squares, this.svg);
+    this.badgeLayer = document.createElement('div');
+    this.badgeLayer.className = 'badge-layer';
+    this.el.append(this.squares, this.svg, this.badgeLayer);
     this.flipped = false;
   }
 
@@ -42,7 +45,7 @@ export class Board {
     return this.flipped ? { x: 7 - f + 0.5, y: r + 0.5 } : { x: f + 0.5, y: 7 - r + 0.5 };
   }
 
-  render({ fen, lastMove = null, arrow = null, flipped = this.flipped }) {
+  render({ fen, lastMove = null, arrow = null, badge = null, flipped = this.flipped }) {
     this.flipped = flipped;
     const pieces = parsePlacement(fen);
     const frag = document.createDocumentFragment();
@@ -53,7 +56,10 @@ export class Board {
         const sq = FILES[f] + (r + 1);
         const div = document.createElement('div');
         div.className = `square ${(f + r) % 2 === 0 ? 'dark' : 'light'}`;
-        if (lastMove && (sq === lastMove.from || sq === lastMove.to)) div.classList.add('last');
+        if (lastMove && (sq === lastMove.from || sq === lastMove.to)) {
+          div.classList.add('last');
+          if (lastMove.cls) div.classList.add(`last-${lastMove.cls}`);
+        }
         if (pieces[sq]) {
           const p = document.createElement('div');
           p.className = `piece ${pieces[sq]}`;
@@ -79,6 +85,21 @@ export class Board {
       line.setAttribute('y2', b.y - (b.y - a.y) * shorten);
       line.setAttribute('marker-end', 'url(#arrowhead)');
       this.svg.append(line);
+    }
+
+    // Icône dans le coin supérieur droit de la case d'arrivée (ré-animée à chaque coup).
+    const badgeKey = badge ? `${badge.square}|${badge.html}|${flipped}` : '';
+    if (badgeKey === this.badgeKey) return;
+    this.badgeKey = badgeKey;
+    this.badgeLayer.replaceChildren();
+    if (badge) {
+      const { x, y } = this.screenPos(badge.square);
+      const holder = document.createElement('div');
+      holder.className = 'board-badge';
+      holder.style.left = `${((x + 0.5) / 8) * 100}%`;
+      holder.style.top = `${((y - 0.5) / 8) * 100}%`;
+      holder.innerHTML = badge.html;
+      this.badgeLayer.append(holder);
     }
   }
 }

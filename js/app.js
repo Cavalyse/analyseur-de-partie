@@ -3,7 +3,7 @@ import { Board } from './board.js';
 import { Engine } from './engine.js';
 import { EvalGraph } from './graph.js';
 import {
-  CLASSIFICATIONS, classifyMove, formatEval, gameAccuracy, toWhitePov, whiteWinPercent,
+  CLASSIFICATIONS, classBadge, classifyMove, formatEval, gameAccuracy, isBrilliant, toWhitePov, whiteWinPercent,
 } from './analysis.js';
 import {
   TIME_CLASS_LABELS, archiveLabel, fetchArchiveGames, fetchArchives, resultFor,
@@ -213,6 +213,10 @@ async function runAnalysis() {
       Object.assign(move, classifyMove({
         before: prev.eval, after: pos.eval, color: move.color, playedUci: move.uci, bestUci: prev.best,
       }));
+      if (isBrilliant({
+        fenBefore: prev.fen, fenAfter: pos.fen, pvAfter: pos.pv, color: move.color,
+        classification: move.classification, after: pos.eval, moveTo: move.to,
+      })) move.classification = 'brilliant';
       if (prev.best && prev.best !== move.uci) move.bestSan = uciToSan(prev.fen, prev.best);
       updateMoveCell(i - 1);
     }
@@ -286,8 +290,8 @@ function updateMoveCell(i, cell = $(`#moves .move[data-index="${i}"]`)) {
   const m = state.game.moves[i];
   const cls = m.classification;
   cell.className = `move${cls ? ` ${cls}` : ''}${state.ply === i + 1 ? ' current' : ''}`;
-  const sym = cls && cls !== 'good' && cls !== 'excellent' ? `<span class="sym">${CLASSIFICATIONS[cls].symbol}</span>` : '';
-  cell.innerHTML = `${escapeHtml(m.san)}${sym}`;
+  const icon = cls && !['good', 'excellent'].includes(cls) ? classBadge(cls, 'mini') : '';
+  cell.innerHTML = `${icon}${escapeHtml(m.san)}`;
   cell.title = cls ? CLASSIFICATIONS[cls].label : '';
 }
 
@@ -309,13 +313,13 @@ function playerLine(color) {
 
 function renderSummary() {
   const { moves, headers } = state.game;
-  const keys = ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder'];
+  const keys = Object.keys(CLASSIFICATIONS);
   const count = (color, k) => moves.filter((m) => m.color === color && m.classification === k).length;
   let html = `<div class="summary-head"><span>${escapeHtml(headers.Result || '')}</span>`;
   if (headers.Termination) html += ` <span class="muted small">${escapeHtml(headers.Termination)}</span>`;
   html += '</div><table><thead><tr><th></th><th>Blancs</th><th>Noirs</th></tr></thead><tbody>';
   for (const k of keys) {
-    html += `<tr class="${k}"><td><span class="badge ${k}">${CLASSIFICATIONS[k].symbol}</span> ${CLASSIFICATIONS[k].label}</td>
+    html += `<tr class="${k}"><td>${classBadge(k)} ${CLASSIFICATIONS[k].label}</td>
       <td>${count('w', k)}</td><td>${count('b', k)}</td></tr>`;
   }
   html += '</tbody></table>';
@@ -338,13 +342,14 @@ function renderComment() {
     return;
   }
   const info = CLASSIFICATIONS[m.classification];
-  let html = `<span class="badge ${m.classification}">${info.symbol}</span>
-    <strong>${num} ${escapeHtml(m.san)}</strong> : ${info.label.toLowerCase()}`;
-  html += ` <span class="muted">(éval. ${formatEval(pos.eval)})</span>`;
+  let html = `<div class="comment-head ${m.classification}">${classBadge(m.classification)}
+    <span><strong>${num} ${escapeHtml(m.san)}</strong> ${info.phrase}</span>
+    <span class="eval-chip">${formatEval(pos.eval)}</span></div>`;
   if (m.bestSan && m.classification !== 'best') {
-    html += `<br>Meilleur coup : <strong>${escapeHtml(m.bestSan)}</strong>`;
+    html += `<div class="comment-best">${classBadge('best')} Meilleur coup : <strong>${escapeHtml(m.bestSan)}</strong>`;
     const prev = positions[state.ply - 1];
     if (prev.pv && prev.pv.length > 1) html += ` <span class="muted small">${escapeHtml(pvToSan(prev.fen, prev.pv.slice(0, 6)))}</span>`;
+    html += '</div>';
   }
   $('#comment').innerHTML = html;
 }
@@ -372,14 +377,15 @@ function render() {
   const move = moves[state.ply - 1];
 
   let arrow = null;
-  if (move && move.classification && !['best', 'excellent'].includes(move.classification)) {
+  if (move && move.classification && !['brilliant', 'best', 'excellent'].includes(move.classification)) {
     const best = positions[state.ply - 1].best;
     if (best) arrow = { from: best.slice(0, 2), to: best.slice(2, 4) };
   }
   board.render({
     fen: pos.fen,
     flipped: state.flipped,
-    lastMove: move ? { from: move.from, to: move.to } : null,
+    lastMove: move ? { from: move.from, to: move.to, cls: move.classification } : null,
+    badge: move && move.classification ? { square: move.to, html: classBadge(move.classification, 'on-board') } : null,
     arrow,
   });
 
