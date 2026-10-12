@@ -32,43 +32,46 @@ function audio() {
   return ctx;
 }
 
-/** Petit « toc » de pièce en bois : bruit filtré très court + note grave. */
-function knock(ac, when, { freq = 1700, gain = 0.5, length = 0.07 } = {}) {
-  const buffer = ac.createBuffer(1, Math.ceil(ac.sampleRate * length), ac.sampleRate);
-  const ch = buffer.getChannelData(0);
-  for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / ch.length) ** 3;
-  const noise = ac.createBufferSource();
-  noise.buffer = buffer;
-  const filter = ac.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.value = freq;
-  filter.Q.value = 1.2;
-  const g = ac.createGain();
-  g.gain.value = gain;
-  noise.connect(filter).connect(g).connect(ac.destination);
-  noise.start(when);
+/**
+ * « Toc » doux de pièce en bois posée sur l'échiquier : quelques sinusoïdes très amorties
+ * (comme un bloc de bois), filtrées pour adoucir les aigus. `pitch` décale la hauteur.
+ */
+function wood(ac, when, { pitch = 1, gain = 0.3 } = {}) {
+  const out = ac.createGain();
+  out.gain.value = gain;
+  const lowpass = ac.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 2200;
+  lowpass.connect(out).connect(ac.destination);
 
-  const osc = ac.createOscillator();
-  osc.frequency.setValueAtTime(180, when);
-  osc.frequency.exponentialRampToValueAtTime(70, when + length);
-  const og = ac.createGain();
-  og.gain.setValueAtTime(gain * 0.6, when);
-  og.gain.exponentialRampToValueAtTime(0.001, when + length);
-  osc.connect(og).connect(ac.destination);
-  osc.start(when);
-  osc.stop(when + length);
+  // [fréquence, amplitude relative, durée d'extinction en secondes]
+  const partials = [[310, 1, 0.11], [740, 0.45, 0.06], [1520, 0.12, 0.03]];
+  for (const [freq, amp, decay] of partials) {
+    const osc = ac.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq * pitch;
+    const env = ac.createGain();
+    env.gain.setValueAtTime(0.0001, when);
+    env.gain.linearRampToValueAtTime(amp, when + 0.003);
+    env.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+    osc.connect(env).connect(lowpass);
+    osc.start(when);
+    osc.stop(when + decay + 0.02);
+  }
 }
 
-function beep(ac, when, freq, length = 0.12, gain = 0.12) {
+/** Note douce (onde triangle) pour les sons de réussite et d'échec de l'entraînement. */
+function note(ac, when, freq, length = 0.25, gain = 0.07) {
   const osc = ac.createOscillator();
-  osc.type = 'sine';
+  osc.type = 'triangle';
   osc.frequency.value = freq;
-  const g = ac.createGain();
-  g.gain.setValueAtTime(gain, when);
-  g.gain.exponentialRampToValueAtTime(0.001, when + length);
-  osc.connect(g).connect(ac.destination);
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, when);
+  env.gain.linearRampToValueAtTime(gain, when + 0.015);
+  env.gain.exponentialRampToValueAtTime(0.0001, when + length);
+  osc.connect(env).connect(ac.destination);
   osc.start(when);
-  osc.stop(when + length);
+  osc.stop(when + length + 0.02);
 }
 
 /**
@@ -82,27 +85,26 @@ export function playSound(kind) {
   const t = ac.currentTime + 0.01;
   switch (kind) {
     case 'capture':
-      knock(ac, t, { freq: 2600, gain: 0.8, length: 0.09 });
-      knock(ac, t + 0.03, { freq: 1200, gain: 0.4 });
+      wood(ac, t, { pitch: 0.9, gain: 0.38 });
+      wood(ac, t + 0.035, { pitch: 1.15, gain: 0.22 });
       break;
     case 'castle':
-      knock(ac, t);
-      knock(ac, t + 0.11);
+      wood(ac, t, { pitch: 1 });
+      wood(ac, t + 0.1, { pitch: 0.92 });
       break;
     case 'check':
-      knock(ac, t);
-      beep(ac, t + 0.02, 880);
+      wood(ac, t, { pitch: 1.2, gain: 0.34 });
       break;
     case 'success':
-      beep(ac, t, 660, 0.12, 0.15);
-      beep(ac, t + 0.1, 990, 0.2, 0.15);
+      note(ac, t, 784);
+      note(ac, t + 0.11, 1175, 0.35);
       break;
     case 'fail':
-      beep(ac, t, 300, 0.18, 0.15);
-      beep(ac, t + 0.12, 220, 0.25, 0.15);
+      note(ac, t, 392, 0.22);
+      note(ac, t + 0.12, 330, 0.3);
       break;
     default:
-      knock(ac, t);
+      wood(ac, t);
   }
 }
 
