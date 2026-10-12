@@ -3,6 +3,11 @@ import { Board } from './board.js';
 import { Engine } from './engine.js';
 import { initFeedback } from './feedback.js';
 import { EvalGraph } from './graph.js';
+import { loadOpenings, openingInfo } from './openings.js';
+import {
+  isSoundEnabled, moveSoundKind, playSound, setSoundEnabled,
+} from './sounds.js';
+import { Trainer, findExercises } from './training.js';
 import {
   CLASSIFICATIONS, classBadge, classifyMove, formatEval, gameAccuracy, isBrilliant, toWhitePov, whiteWinPercent,
 } from './analysis.js';
@@ -16,7 +21,7 @@ const state = {
   username: '',
   archives: [],
   archiveIndex: 0,
-  game: null, // { headers, chesscom, positions, moves }
+  game: null, // { headers, chesscom, positions, moves, pgn, myColor, bookPlies, openingNames }
   ply: 0,
   flipped: false,
   token: 0,
@@ -26,6 +31,17 @@ const state = {
 const board = new Board($('#board'));
 const graph = new EvalGraph($('#graph'), (ply) => goTo(ply));
 let engine = null;
+const trainer = new Trainer({
+  board,
+  panel: $('#training'),
+  getEngine: () => engine,
+  getDepth: () => Number($('#depth').value),
+  onExit: () => {
+    $('#analysis').classList.remove('training-mode');
+    updateTrainingCta();
+    render();
+  },
+});
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -124,7 +140,7 @@ function appendGames(games, label) {
     li.querySelector('button').addEventListener('click', () => {
       list.querySelectorAll('.game.selected').forEach((el) => el.classList.remove('selected'));
       li.classList.add('selected');
-      loadGame(g.pgn, { chesscom: g, flipped: !meIsWhite });
+      loadGame(g.pgn, { chesscom: g, flipped: !meIsWhite, myColor: meIsWhite ? 'w' : 'b' });
     });
     list.append(li);
   }
@@ -146,9 +162,10 @@ $('#pgn-form').addEventListener('submit', (e) => {
 
 /* ---------- Chargement et analyse d'une partie ---------- */
 
-function loadGame(pgn, { chesscom = null, flipped = false }) {
+function loadGame(pgn, { chesscom = null, flipped = false, myColor = null }) {
   const chess = new Chess();
   chess.loadPgn(pgn);
+  trainer.exit();
   const history = chess.history({ verbose: true });
   const startFen = history.length ? history[0].before : chess.fen();
 
@@ -161,15 +178,20 @@ function loadGame(pgn, { chesscom = null, flipped = false }) {
       from: m.from,
       to: m.to,
       color: m.color,
+      captured: Boolean(m.captured),
+      castle: /[kq]/.test(m.flags),
     };
   });
 
-  state.game = { headers: chess.getHeaders(), chesscom, positions, moves, pgn };
+  state.game = {
+    headers: chess.getHeaders(), chesscom, positions, moves, pgn, myColor, bookPlies: 0, openingNames: [],
+  };
   state.flipped = flipped;
   state.ply = 0;
 
   $('#placeholder').hidden = true;
   $('#analysis').hidden = false;
+  updateTrainingCta();
   buildMoveList();
   render();
   runAnalysis();
@@ -184,8 +206,13 @@ async function runAnalysis() {
     if (!engine) engine = new Engine();
     if (state.analysing) engine.stop();
     state.analysing = true;
+    updateTrainingCta();
     setProgress(0, 'Démarrage de Stockfish…');
-    await engine.newGame();
+    await Promise.all([engine.newGame(), loadOpenings()]);
+    if (token !== state.token) return;
+    const opening = openingInfo(positions.map((p) => p.fen));
+    state.game.bookPlies = opening.bookPlies;
+    state.game.openingNames = opening.names;
   } catch (err) {
     state.analysing = false;
     setProgress(0, err.message || "Impossible de démarrer le moteur d'analyse.");
@@ -214,7 +241,9 @@ async function runAnalysis() {
       Object.assign(move, classifyMove({
         before: prev.eval, after: pos.eval, color: move.color, playedUci: move.uci, bestUci: prev.best,
       }));
-      if (isBrilliant({
+      if (i <= state.game.bookPlies) {
+        move.classification = 'book';
+      } else if (isBrilliant({
         fenBefore: prev.fen, fenAfter: pos.fen, pvAfter: pos.pv, color: move.color,
         classification: move.classification, after: pos.eval, moveTo: move.to,
       })) move.classification = 'brilliant';
@@ -228,8 +257,40 @@ async function runAnalysis() {
 
   state.analysing = false;
   setProgress(1, `Analyse terminée (profondeur ${depth})`);
+  updateTrainingCta();
   render();
 }
+
+/* ---------- Mode entraînement ---------- */
+
+/** Couleur du joueur qui s'entraîne : celle du pseudo Chess.com, sinon celle du bas de l'échiquier. */
+function trainingColor() {
+  return state.game.myColor || (state.flipped ? 'b' : 'w');
+}
+
+function updateTrainingCta() {
+  const cta = $('#training-cta');
+  if (!state.game || state.analysing || trainer.active) {
+    cta.hidden = true;
+    return;
+  }
+  const color = trainingColor();
+  const count = findExercises(state.game, color).length;
+  const who = color === 'w' ? 'Blancs' : 'Noirs';
+  cta.hidden = false;
+  cta.innerHTML = count
+    ? `<button type="button" class="btn-primary" id="train-btn">🎯 Rejouer mes erreurs (${count})</button>
+       <span class="muted small">Retrouve le bon coup là où ${state.game.myColor ? 'tu as' : `les ${who} ont`} fait une erreur ou une gaffe.</span>`
+    : `<span class="muted small">🎉 Aucune erreur ni gaffe à retravailler pour les ${who}.</span>`;
+}
+
+$('#training-cta').addEventListener('click', (e) => {
+  if (!e.target.closest('#train-btn') || !state.game) return;
+  if (trainer.start(state.game, trainingColor())) {
+    $('#analysis').classList.add('training-mode');
+    $('#training-cta').hidden = true;
+  }
+});
 
 function uciToSan(fen, uci) {
   try {
@@ -242,6 +303,7 @@ function uciToSan(fen, uci) {
 
 $('#depth').addEventListener('change', () => {
   if (state.game) {
+    trainer.exit();
     state.game.positions.forEach((p) => { delete p.eval; delete p.best; delete p.pv; });
     state.game.moves.forEach((m) => { delete m.classification; delete m.accuracy; delete m.bestSan; });
     buildMoveList();
@@ -298,8 +360,9 @@ function updateMoveCell(i, cell = $(`#moves .move[data-index="${i}"]`)) {
 
 function playerLine(color) {
   const { headers, chesscom, moves } = state.game;
-  const name = color === 'w' ? headers.White : headers.Black;
-  const elo = color === 'w' ? headers.WhiteElo : headers.BlackElo;
+  const clean = (v) => (v && v !== '?' ? v : null);
+  const name = clean(color === 'w' ? headers.White : headers.Black);
+  const elo = clean(color === 'w' ? headers.WhiteElo : headers.BlackElo);
   const accs = moves.filter((m) => m.color === color && m.accuracy !== undefined).map((m) => m.accuracy);
   const acc = gameAccuracy(accs);
   const ccAcc = chesscom?.accuracies?.[color === 'w' ? 'white' : 'black'];
@@ -318,6 +381,8 @@ function renderSummary() {
   const count = (color, k) => moves.filter((m) => m.color === color && m.classification === k).length;
   let html = `<div class="summary-head"><span>${escapeHtml(headers.Result || '')}</span>`;
   if (headers.Termination) html += ` <span class="muted small">${escapeHtml(headers.Termination)}</span>`;
+  const opening = state.game.openingNames[state.game.openingNames.length - 1];
+  if (opening) html += `<div class="opening-name">${classBadge('book', 'mini')}${escapeHtml(opening)}</div>`;
   html += '</div><table><thead><tr><th></th><th>Blancs</th><th>Noirs</th></tr></thead><tbody>';
   for (const k of keys) {
     html += `<tr class="${k}"><td>${classBadge(k)} ${CLASSIFICATIONS[k].label}</td>
@@ -346,7 +411,9 @@ function renderComment() {
   let html = `<div class="comment-head ${m.classification}">${classBadge(m.classification)}
     <span><strong>${num} ${escapeHtml(m.san)}</strong> ${info.phrase}</span>
     <span class="eval-chip">${formatEval(pos.eval)}</span></div>`;
-  if (m.bestSan && m.classification !== 'best') {
+  const opening = state.game.openingNames[state.ply];
+  if (m.classification === 'book' && opening) html += `<div class="comment-best muted">${escapeHtml(opening)}</div>`;
+  if (m.bestSan && !['best', 'book'].includes(m.classification)) {
     html += `<div class="comment-best">${classBadge('best')} Meilleur coup : <strong>${escapeHtml(m.bestSan)}</strong>`;
     const prev = positions[state.ply - 1];
     if (prev.pv && prev.pv.length > 1) html += ` <span class="muted small">${escapeHtml(pvToSan(prev.fen, prev.pv.slice(0, 6)))}</span>`;
@@ -371,14 +438,14 @@ function pvToSan(fen, pv) {
   return out.join(' ');
 }
 
-function render() {
-  if (!state.game) return;
+function render({ animate = [] } = {}) {
+  if (!state.game || trainer.active) return;
   const { positions, moves } = state.game;
   const pos = positions[state.ply];
   const move = moves[state.ply - 1];
 
   let arrow = null;
-  if (move && move.classification && !['brilliant', 'best', 'excellent'].includes(move.classification)) {
+  if (move && move.classification && !['brilliant', 'best', 'excellent', 'book'].includes(move.classification)) {
     const best = positions[state.ply - 1].best;
     if (best) arrow = { from: best.slice(0, 2), to: best.slice(2, 4) };
   }
@@ -388,6 +455,7 @@ function render() {
     lastMove: move ? { from: move.from, to: move.to, cls: move.classification } : null,
     badge: move && move.classification ? { square: move.to, html: classBadge(move.classification, 'on-board') } : null,
     arrow,
+    animate,
   });
 
   // Barre d'évaluation
@@ -421,10 +489,28 @@ function scrollMoveListTo(cell) {
   else if (r.bottom > box.bottom) list.scrollTop += r.bottom - box.bottom + 4;
 }
 
+/** Déplacements à animer pour un coup (la tour aussi en cas de roque), éventuellement à l'envers. */
+function moveAnimation(m, reverse) {
+  const list = [{ from: m.from, to: m.to }];
+  if (m.castle) {
+    const rank = m.color === 'w' ? '1' : '8';
+    list.push(m.to[0] === 'g' ? { from: `h${rank}`, to: `f${rank}` } : { from: `a${rank}`, to: `d${rank}` });
+  }
+  return reverse ? list.map(({ from, to }) => ({ from: to, to: from })) : list;
+}
+
 function goTo(ply) {
-  if (!state.game) return;
+  if (!state.game || trainer.active) return;
+  const { moves } = state.game;
+  const prev = state.ply;
   state.ply = Math.max(0, Math.min(state.game.positions.length - 1, ply));
-  render();
+  if (state.ply === prev) return;
+  let animate = [];
+  if (state.ply === prev + 1) animate = moveAnimation(moves[prev], false);
+  else if (state.ply === prev - 1) animate = moveAnimation(moves[state.ply], true);
+  render({ animate });
+  if (state.ply === prev - 1) playSound('move');
+  else if (state.ply > 0) playSound(moveSoundKind(moves[state.ply - 1]));
 }
 
 document.querySelectorAll('[data-nav]').forEach((btn) => {
@@ -434,18 +520,36 @@ document.querySelectorAll('[data-nav]').forEach((btn) => {
     if (action === 'prev') goTo(state.ply - 1);
     if (action === 'next') goTo(state.ply + 1);
     if (action === 'end') goTo(Infinity);
-    if (action === 'flip') { state.flipped = !state.flipped; render(); }
+    if (action === 'flip') { state.flipped = !state.flipped; updateTrainingCta(); render(); }
+    if (action === 'sound') toggleSound();
   });
 });
+
+function toggleSound() {
+  setSoundEnabled(!isSoundEnabled());
+  updateSoundButton();
+}
+
+function updateSoundButton() {
+  const btn = $('#sound-btn');
+  btn.textContent = isSoundEnabled() ? '🔊' : '🔇';
+  btn.title = isSoundEnabled() ? 'Couper le son (S)' : 'Activer le son (S)';
+}
+updateSoundButton();
 
 document.addEventListener('keydown', (e) => {
   if (!state.game || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   if ($('#feedback-dialog').open) return;
+  if (trainer.active) {
+    if (e.key === 'Escape') trainer.exit();
+    return;
+  }
   if (e.key === 'ArrowLeft') goTo(state.ply - 1);
   else if (e.key === 'ArrowRight') goTo(state.ply + 1);
   else if (e.key === 'Home' || e.key === 'ArrowUp') goTo(0);
   else if (e.key === 'End' || e.key === 'ArrowDown') goTo(Infinity);
-  else if (e.key === 'f') { state.flipped = !state.flipped; render(); }
+  else if (e.key === 'f') { state.flipped = !state.flipped; updateTrainingCta(); render(); }
+  else if (e.key === 's') toggleSound();
   else return;
   e.preventDefault();
 });
