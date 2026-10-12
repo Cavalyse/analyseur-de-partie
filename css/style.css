@@ -435,6 +435,65 @@ textarea { resize: vertical; font-family: ui-monospace, monospace; font-size: 0.
 
 .site-footer { padding: 16px; text-align: center; font-size: 0.8em; color: var(--muted); }
 
+/* ---------- Rubrique « Bug ou idée ? » ---------- */
+
+.feedback-btn {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+}
+.feedback-btn:hover { background: #494744; }
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.site-footer p { margin: 0 0 6px; }
+
+.feedback-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.feedback-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.feedback-dialog h2 { margin: 0 0 4px; color: var(--text); font-size: 1.25rem; }
+.feedback-dialog p { margin: 0 0 12px; }
+.feedback-types { display: flex; gap: 8px; margin-bottom: 12px; }
+.feedback-types label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.feedback-types label:has(input:checked) { box-shadow: inset 0 0 0 2px var(--accent); }
+.feedback-types input, .checkbox input { width: auto; accent-color: var(--accent); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 0.9em; color: var(--muted); }
+.checkbox { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.9em; }
+.checkbox[hidden] { display: none; }
+.dialog-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.dialog-actions .spacer { flex: 1; }
+.dialog-actions .secondary { width: auto; margin: 0; }
+.dialog-actions a { font-size: 0.9em; }
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 1000px) {

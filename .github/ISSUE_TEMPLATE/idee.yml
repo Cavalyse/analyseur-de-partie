@@ -1,0 +1,12 @@
+name: 💡 Proposer une idée
+description: Suggérer une nouvelle fonctionnalité ou un changement.
+title: "[Idée] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description de la demande
+      description: Qu'aimerais-tu voir sur le site, et pourquoi ?
+    validations:
+      required: true

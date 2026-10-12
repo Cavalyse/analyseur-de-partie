@@ -1,0 +1,2 @@
+# Les demandes envoyées depuis le site utilisent une issue pré-remplie : on garde donc les issues libres.
+blank_issues_enabled: true
