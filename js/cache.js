@@ -31,6 +31,7 @@ function hash(str) {
 /** Identifiant d'une partie : son lien Chess.com, sinon une empreinte de ses coups. */
 export function gameKey(game) {
   if (game.chesscom?.url) return game.chesscom.url;
+  if (game.headers?.Link) return game.headers.Link; // PGN exporté de Chess.com : même identifiant
   return `pgn:${hash(game.positions[0].fen + game.moves.map((m) => m.san).join(' '))}`;
 }
 

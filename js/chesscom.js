@@ -9,6 +9,13 @@ const RETRIES = 3;
 
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
+/** Erreur passagère (réseau, limite de requêtes) : les parties mémorisées peuvent prendre le relais. */
+function retryableError(message) {
+  const err = new Error(message);
+  err.retryable = true;
+  return err;
+}
+
 /**
  * Requête JSON vers l'API, avec nouvelles tentatives en cas d'échec réseau ou de limite de
  * requêtes (429). À partir du deuxième essai, le cache du navigateur est contourné, au cas où
@@ -22,19 +29,19 @@ async function getJson(url) {
     try {
       res = await fetch(url, attempt ? { cache: 'reload' } : {});
     } catch {
-      lastError = new Error(NETWORK_ERROR); // « Failed to fetch » : aucune réponse lisible
+      lastError = retryableError(NETWORK_ERROR); // « Failed to fetch » : aucune réponse lisible
       continue;
     }
     if (res.status === 404) throw new Error('Joueur introuvable sur Chess.com : vérifie le pseudo.');
     if (res.status === 429) {
-      lastError = new Error('Chess.com limite les requêtes trop rapprochées : réessaie dans quelques secondes.');
+      lastError = retryableError('Chess.com limite les requêtes trop rapprochées : réessaie dans quelques secondes.');
       continue;
     }
     if (!res.ok) throw new Error(`Chess.com a répondu par une erreur (${res.status}). Réessaie plus tard.`);
     try {
       return await res.json();
     } catch {
-      lastError = new Error('Réponse de Chess.com illisible. Réessaie dans quelques secondes.');
+      lastError = retryableError('Réponse de Chess.com illisible. Réessaie dans quelques secondes.');
     }
   }
   throw lastError;

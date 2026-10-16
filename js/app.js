@@ -6,6 +6,10 @@ import {
 import { formatClock, formatSpent, parseClocks } from './clocks.js';
 import { Engine } from './engine.js';
 import { initFeedback } from './feedback.js';
+import { pgnHeaders, splitPgn, timeClassOf } from './pgn-file.js';
+import {
+  clearImport, loadImport, loadSavedGames, saveImport, saveMonth,
+} from './saved-games.js';
 import { EvalGraph } from './graph.js';
 import { loadOpenings, openingInfo } from './openings.js';
 import {
@@ -25,6 +29,7 @@ const state = {
   username: '',
   archives: [],
   archiveIndex: 0,
+  offline: null, // parties mémorisées utilisées quand Chess.com est injoignable
   game: null, // { headers, chesscom, positions, moves, pgn, myColor, bookPlies, openingNames }
   ply: 0,
   flipped: false,
@@ -84,6 +89,7 @@ $('#search-form').addEventListener('submit', async (e) => {
   $('#games-list').innerHTML = '';
   $('#more-games').hidden = true;
   $('#filters').hidden = true;
+  setOffline(null);
   $('#search-status').textContent = 'Recherche des parties…';
   try {
     state.archives = await fetchArchives(username);
@@ -94,9 +100,34 @@ $('#search-form').addEventListener('submit', async (e) => {
     }
     await loadNextArchive();
   } catch (err) {
-    showSearchError(err, `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/games/archives`);
+    const saved = err.retryable && loadSavedGames(username);
+    if (saved && Object.keys(saved.months).length) {
+      useSavedGames(saved);
+      await loadNextArchive();
+    } else {
+      showSearchError(err, `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/games/archives`);
+    }
   }
 });
+
+/** Bascule sur les parties mémorisées (Chess.com injoignable), à partir d'un mois donné. */
+function useSavedGames(saved, fromUrl = null) {
+  setOffline(saved);
+  state.archives = saved.archives.filter((url) => saved.months[url]);
+  state.archiveIndex = fromUrl ? Math.max(0, state.archives.indexOf(fromUrl)) : 0;
+}
+
+function setOffline(saved) {
+  state.offline = saved;
+  const note = $('#offline-note');
+  note.hidden = !saved;
+  if (saved) {
+    const when = new Date(saved.savedAt).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    });
+    note.textContent = `📴 Chess.com est injoignable : voici tes parties mémorisées (dernière mise à jour le ${when}).`;
+  }
+}
 
 /** Message d'erreur de recherche, avec un lien pour tester l'accès direct à l'API Chess.com. */
 function showSearchError(err, testUrl) {
@@ -115,16 +146,25 @@ async function loadNextArchive() {
   if (!url) return;
   $('#more-games').disabled = true;
   $('#search-status').textContent = `Chargement de ${archiveLabel(url)}…`;
+  let fallback = false;
   try {
-    const games = await fetchArchiveGames(url);
+    const games = state.offline ? state.offline.months[url] : await fetchArchiveGames(url);
+    if (!state.offline) saveMonth(state.username, state.archives, url, games);
     state.archiveIndex += 1;
     appendGames(games, archiveLabel(url));
     $('#more-games').hidden = state.archiveIndex >= state.archives.length;
   } catch (err) {
-    showSearchError(err, url);
+    const saved = err.retryable && loadSavedGames(state.username);
+    if (saved?.months[url]) {
+      useSavedGames(saved, url);
+      fallback = true;
+    } else {
+      showSearchError(err, url);
+    }
   } finally {
     $('#more-games').disabled = false;
   }
+  if (fallback) await loadNextArchive();
 }
 
 function appendGames(games, label) {
@@ -170,12 +210,15 @@ function appendGames(games, label) {
 
 /** Pastille « déjà analysée » avec la précision du joueur, dans la liste des parties. */
 function refreshGameTag(key) {
-  const li = [...document.querySelectorAll('#games-list .game')].find((el) => el.dataset.key === key);
-  const summary = analysisSummary(key);
-  if (!li || !summary) return;
-  const acc = summary.accuracy?.[li.dataset.color];
-  li.querySelector('.game-tag').innerHTML = `<span class="analysed" title="Déjà analysée : rouverture instantanée">${
-    acc !== null && acc !== undefined ? `${Math.round(acc)} %` : '✓'}</span>`;
+  const summary = key && analysisSummary(key);
+  if (!summary) return;
+  // La même partie peut figurer dans la liste Chess.com et dans celle d'un fichier importé.
+  for (const li of document.querySelectorAll('.games-list .game')) {
+    if (li.dataset.key !== key) continue;
+    const acc = summary.accuracy?.[li.dataset.color];
+    li.querySelector('.game-tag').innerHTML = `<span class="analysed" title="Déjà analysée : rouverture instantanée">${
+      acc !== null && acc !== undefined ? `${Math.round(acc)} %` : '✓'}</span>`;
+  }
 }
 
 /* ---------- Filtres de la liste ---------- */
@@ -212,6 +255,93 @@ function applyFilters() {
 
 ['#filter-time', '#filter-result'].forEach((sel) => $(sel).addEventListener('change', applyFilters));
 $('#filter-opponent').addEventListener('input', applyFilters);
+
+/* ---------- Import d'un fichier PGN ---------- */
+
+$('#pgn-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    showImported(file.name, await file.text(), true);
+  } catch {
+    $('#import-status').textContent = 'Impossible de lire ce fichier.';
+  }
+});
+
+$('#import-status').addEventListener('click', (e) => {
+  if (!e.target.closest('[data-clear-import]')) return;
+  clearImport();
+  $('#imported-list').innerHTML = '';
+  $('#import-status').textContent = '';
+});
+
+/** Date d'un en-tête PGN (« 2026.10.12 ») au format court, ex. « 12 oct. 2026 ». */
+function pgnDate(headers) {
+  const m = (headers.UTCDate || headers.Date || '').match(/^(\d{4})\.(\d{2})\.(\d{2})$/);
+  if (!m) return '';
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    .toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Affiche la liste des parties d'un fichier PGN (les plus récentes en premier). */
+function showImported(name, text, save) {
+  const games = splitPgn(text).map((pgn) => ({ pgn, h: pgnHeaders(pgn) }));
+  const list = $('#imported-list');
+  list.innerHTML = '';
+  if (!games.length) {
+    $('#import-status').textContent = `Aucune partie trouvée dans « ${name} ».`;
+    return;
+  }
+  if (save) saveImport(name, text);
+  const stamp = (h) => `${h.UTCDate || h.Date || ''} ${h.UTCTime || h.EndTime || ''}`;
+  games.sort((a, b) => stamp(b.h).localeCompare(stamp(a.h)));
+  $('#import-status').innerHTML = `📂 ${escapeHtml(name)} : ${games.length} partie${games.length > 1 ? 's' : ''}
+    <button type="button" class="link-btn" data-clear-import>Retirer</button>`;
+
+  const me = ($('#username').value.trim() || storage('username') || '').toLowerCase();
+  for (const { pgn, h } of games) {
+    const white = h.White && h.White !== '?' ? h.White : 'Blancs';
+    const black = h.Black && h.Black !== '?' ? h.Black : 'Noirs';
+    let myColor = null;
+    if (me && white.toLowerCase() === me) myColor = 'w';
+    else if (me && black.toLowerCase() === me) myColor = 'b';
+    const res = h.Result || '*';
+    let badge = `<span class="result raw">${res === '1/2-1/2' ? '½' : escapeHtml(res === '*' ? '–' : res.replace('-', '‑'))}</span>`;
+    if (myColor && res !== '*') {
+      const outcome = res === '1/2-1/2' ? 'draw' : (res === '1-0') === (myColor === 'w') ? 'win' : 'loss';
+      badge = `<span class="result ${outcome}">${{ win: 'V', loss: 'D', draw: 'N' }[outcome]}</span>`;
+    }
+    const players = myColor
+      ? `<span class="color-dot ${myColor}"></span>vs ${escapeHtml(myColor === 'w' ? black : white)}`
+      : `${escapeHtml(white)} – ${escapeHtml(black)}`;
+    const details = [TIME_CLASS_LABELS[timeClassOf(h)], pgnDate(h)].filter(Boolean).join(' · ');
+    const li = document.createElement('li');
+    li.className = 'game';
+    li.dataset.key = h.Link || '';
+    li.dataset.color = myColor || '';
+    li.innerHTML = `
+      <button type="button">
+        ${badge}
+        <span class="game-main">
+          <span class="opponent">${players}</span>
+          <span class="muted small">${escapeHtml(details || h.Event || '')}</span>
+        </span>
+        <span class="game-tag"></span>
+      </button>`;
+    li.querySelector('button').addEventListener('click', () => {
+      try {
+        loadGame(pgn, { flipped: myColor === 'b', myColor });
+        list.querySelectorAll('.game.selected').forEach((el) => el.classList.remove('selected'));
+        li.classList.add('selected');
+      } catch {
+        $('#import-status').textContent = 'Cette partie est illisible (PGN invalide).';
+      }
+    });
+    list.append(li);
+    refreshGameTag(h.Link);
+  }
+}
 
 /* ---------- PGN collé ---------- */
 
@@ -890,3 +1020,6 @@ initFeedback(() => {
 
 const saved = storage('username');
 if (saved) $('#username').value = saved;
+
+const lastImport = loadImport();
+if (lastImport) showImported(lastImport.name, lastImport.text, false);

@@ -5,7 +5,10 @@ Site web qui analyse les parties d'échecs jouées sur **Chess.com**, avec le mo
 ## Fonctionnalités
 
 - Recherche des parties d'un joueur via son pseudo Chess.com (mois par mois), avec filtres (cadence, résultat,
-  adversaire), ou collage d'un PGN.
+  adversaire), collage d'un PGN ou import d'un fichier `.pgn` contenant plusieurs parties.
+- **Sans accès à Chess.com** (réseau d'école filtré, coupure…) : la liste des parties de chaque recherche est mémorisée
+  dans le navigateur (6 derniers mois, 3 pseudos) et s'affiche quand Chess.com est injoignable. L'analyse, elle,
+  tourne entièrement dans le navigateur.
 - Analyse coup par coup avec Stockfish 19 (version WebAssembly « lite », sans serveur).
 - Classification des coups, avec les couleurs et icônes de la revue de partie Chess.com : brillant !!, meilleur coup ★,
   excellent, bon, théorique 📖, imprécision ?!, erreur ?, occasion manquée ✕, gaffe ??. L'icône s'affiche sur l'échiquier, sur la case d'arrivée du coup.
@@ -58,6 +61,8 @@ Avec GitHub Pages : *Settings → Pages → Deploy from a branch*, choisir la br
 | `js/sounds.js` | Sons des coups (Web Audio API, sans fichier audio) |
 | `js/clocks.js` | Pendules et temps passé par coup (commentaires `[%clk]` des PGN Chess.com) |
 | `js/cache.js` | Mémoire des analyses (localStorage, 150 parties au plus) |
+| `js/saved-games.js` | Parties Chess.com mémorisées et dernier fichier PGN importé |
+| `js/pgn-file.js` | Lecture d'un fichier PGN de plusieurs parties |
 | `data/openings.json` | Positions théoriques, générées par `scripts/build-openings.mjs` |
 | `js/feedback.js` | Rubrique « Bug ou idée ? » (prépare une issue GitHub) |
 | `.github/ISSUE_TEMPLATE/` | Formulaires de demande sur GitHub |

@@ -29,6 +29,7 @@
           <button type="submit">Rechercher</button>
         </form>
         <p id="search-status" class="status"></p>
+        <p id="offline-note" class="offline-note" hidden></p>
         <div class="filters" id="filters" hidden>
           <select id="filter-time" aria-label="Cadence">
             <option value="">Toutes cadences</option>
@@ -55,6 +56,14 @@
           <button type="submit">Analyser ce PGN</button>
         </form>
         <p id="pgn-status" class="status"></p>
+        <div class="import-box">
+          <label class="secondary file-btn">📂 Importer un fichier .pgn (plusieurs parties)
+            <input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn" hidden>
+          </label>
+          <p class="muted small">Sur Chess.com : <em>Parties → Archive</em>, sélectionne tes parties puis <em>Télécharger</em>.</p>
+          <p id="import-status" class="status"></p>
+          <ul id="imported-list" class="games-list"></ul>
+        </div>
       </section>
 
       <section class="settings">
