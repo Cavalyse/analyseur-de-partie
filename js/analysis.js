@@ -53,6 +53,7 @@ export const CLASSIFICATIONS = {
   book: { label: 'Théorique', phrase: 'est un coup théorique', icon: BOOK },
   inaccuracy: { label: 'Imprécision', phrase: 'est une imprécision', icon: '?!' },
   mistake: { label: 'Erreur', phrase: 'est une erreur', icon: '?' },
+  miss: { label: 'Occasion manquée', phrase: 'est une occasion manquée', icon: '✕' },
   blunder: { label: 'Gaffe', phrase: 'est une gaffe', icon: '??' },
 };
 
@@ -129,6 +130,17 @@ export function classifyMove({ before, after, color, playedUci, bestUci }) {
   if (cpBefore > 200 && cpAfter <= -MATE_CP + 1000 && classification !== 'best') classification = 'blunder';
 
   return { classification, accuracy, winDrop: drop };
+}
+
+/**
+ * Occasion manquée : l'adversaire vient de commettre une erreur (perte d'au moins 10 % de
+ * probabilité de gain), le joueur ne la punit pas (son coup perd au moins 5 %) mais ne se
+ * retrouve pas plus mal qu'avant l'erreur adverse. S'il finit plus mal, c'est une vraie faute.
+ * wpAfter / wpBeforeGift : probabilités de gain du joueur après son coup et avant l'erreur adverse.
+ */
+export function isMiss(move, previousMove, wpAfter, wpBeforeGift) {
+  if (!previousMove || previousMove.winDrop < 10 || wpBeforeGift === null) return false;
+  return ['inaccuracy', 'mistake', 'blunder'].includes(move.classification) && wpAfter >= wpBeforeGift - 5;
 }
 
 /** Précision globale : moyenne de la moyenne arithmétique et de la moyenne harmonique. */
