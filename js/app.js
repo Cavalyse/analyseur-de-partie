@@ -94,9 +94,19 @@ $('#search-form').addEventListener('submit', async (e) => {
     }
     await loadNextArchive();
   } catch (err) {
-    $('#search-status').textContent = err.message || 'Impossible de contacter Chess.com.';
+    showSearchError(err, `https://api.chess.com/pub/player/${encodeURIComponent(username.toLowerCase())}/games/archives`);
   }
 });
+
+/** Message d'erreur de recherche, avec un lien pour tester l'accès direct à l'API Chess.com. */
+function showSearchError(err, testUrl) {
+  const status = $('#search-status');
+  status.textContent = err.message || 'Impossible de contacter Chess.com.';
+  if (/joindre|illisible|limite/.test(status.textContent)) {
+    status.insertAdjacentHTML('beforeend', ` <a href="${escapeHtml(testUrl)}" target="_blank" rel="noopener">Tester l'accès à Chess.com</a>
+      <span class="muted">(une page de texte doit s'afficher ; sinon, c'est ton navigateur ou ta connexion qui bloque Chess.com).</span>`);
+  }
+}
 
 $('#more-games').addEventListener('click', () => loadNextArchive());
 
@@ -111,7 +121,7 @@ async function loadNextArchive() {
     appendGames(games, archiveLabel(url));
     $('#more-games').hidden = state.archiveIndex >= state.archives.length;
   } catch (err) {
-    $('#search-status').textContent = err.message;
+    showSearchError(err, url);
   } finally {
     $('#more-games').disabled = false;
   }
