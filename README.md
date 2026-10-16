@@ -4,13 +4,22 @@ Site web qui analyse les parties d'échecs jouées sur **Chess.com**, avec le mo
 
 ## Fonctionnalités
 
-- Recherche des parties d'un joueur via son pseudo Chess.com (mois par mois), ou collage d'un PGN.
+- Recherche des parties d'un joueur via son pseudo Chess.com (mois par mois), avec filtres (cadence, résultat,
+  adversaire), collage d'un PGN ou import d'un fichier `.pgn` contenant plusieurs parties.
+- **Sans accès à Chess.com** (réseau d'école filtré, coupure…) : la liste des parties de chaque recherche est mémorisée
+  dans le navigateur (6 derniers mois, 3 pseudos) et s'affiche quand Chess.com est injoignable. L'analyse, elle,
+  tourne entièrement dans le navigateur.
 - Analyse coup par coup avec Stockfish 19 (version WebAssembly « lite », sans serveur).
 - Classification des coups, avec les couleurs et icônes de la revue de partie Chess.com : brillant !!, meilleur coup ★,
-  excellent, bon, théorique 📖, imprécision ?!, erreur ?, gaffe ??. L'icône s'affiche sur l'échiquier, sur la case d'arrivée du coup.
+  excellent, bon, théorique 📖, imprécision ?!, erreur ?, occasion manquée ✕, gaffe ??. L'icône s'affiche sur l'échiquier, sur la case d'arrivée du coup.
 - Nom de l'ouverture (familles traduites en français) et coups théoriques, grâce à la base d'ouvertures de Lichess.
 - **Rejouer mes erreurs** : après l'analyse, on rejoue les positions où l'on a fait une erreur ou une gaffe et on cherche
   le bon coup (clic ou glisser-déposer). Stockfish vérifie la réponse ; indice, solution et bilan à la fin.
+- **Explorer des variantes** : jouer ses propres coups sur l'échiquier ; un second Stockfish évalue la position,
+  classe les coups joués et propose la suite. ← → pour naviguer dans la variante, Échap pour revenir à la partie.
+- Temps passé sur chaque coup et pendules des joueurs (parties Chess.com).
+- Mémoire des analyses dans le navigateur : rouvrir une partie déjà analysée est instantané, et la liste des parties
+  affiche la précision obtenue.
 - Pièces qui glissent quand on navigue, sons des coups (prise, roque, échec) avec bouton pour couper le son (`S`).
 - Précision de chaque joueur (formule de type Lichess) et, si disponible, la précision Chess.com.
 - Meilleur coup proposé (flèche sur l'échiquier + variante principale).
@@ -50,6 +59,10 @@ Avec GitHub Pages : *Settings → Pages → Deploy from a branch*, choisir la br
 | `js/openings.js` | Coups théoriques et nom de l'ouverture |
 | `js/training.js` | Mode « Rejouer mes erreurs » |
 | `js/sounds.js` | Sons des coups (Web Audio API, sans fichier audio) |
+| `js/clocks.js` | Pendules et temps passé par coup (commentaires `[%clk]` des PGN Chess.com) |
+| `js/cache.js` | Mémoire des analyses (localStorage, 150 parties au plus) |
+| `js/saved-games.js` | Parties Chess.com mémorisées et dernier fichier PGN importé |
+| `js/pgn-file.js` | Lecture d'un fichier PGN de plusieurs parties |
 | `data/openings.json` | Positions théoriques, générées par `scripts/build-openings.mjs` |
 | `js/feedback.js` | Rubrique « Bug ou idée ? » (prépare une issue GitHub) |
 | `.github/ISSUE_TEMPLATE/` | Formulaires de demande sur GitHub |
@@ -70,6 +83,9 @@ probabilité de gain (0–100 %). La perte de probabilité causée par un coup d
 | < 10 % | Imprécision |
 | < 20 % | Erreur |
 | ≥ 20 % | Gaffe |
+
+Un coup est une **occasion manquée** quand l'adversaire vient de perdre au moins 10 % de probabilité de gain et que le
+joueur n'en profite pas (son coup perd au moins 5 %), sans pour autant finir plus mal qu'avant l'erreur adverse.
 
 Un coup est **brillant** s'il est le meilleur (ou excellent), que la pièce jouée est sacrifiée (l'adversaire la prend et
 garde au moins 2 pions d'avance en matériel dans la meilleure suite) et que la position reste bonne pour le joueur.

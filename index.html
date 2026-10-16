@@ -29,6 +29,23 @@
           <button type="submit">Rechercher</button>
         </form>
         <p id="search-status" class="status"></p>
+        <p id="offline-note" class="offline-note" hidden></p>
+        <div class="filters" id="filters" hidden>
+          <select id="filter-time" aria-label="Cadence">
+            <option value="">Toutes cadences</option>
+            <option value="bullet">Bullet</option>
+            <option value="blitz">Blitz</option>
+            <option value="rapid">Rapide</option>
+            <option value="daily">Quotidien</option>
+          </select>
+          <select id="filter-result" aria-label="Résultat">
+            <option value="">Tous résultats</option>
+            <option value="win">Victoires</option>
+            <option value="loss">Défaites</option>
+            <option value="draw">Nulles</option>
+          </select>
+          <input id="filter-opponent" type="search" placeholder="Adversaire…" aria-label="Adversaire" autocomplete="off">
+        </div>
         <ul id="games-list" class="games-list"></ul>
         <button id="more-games" class="secondary" hidden>Mois précédent</button>
       </section>
@@ -39,6 +56,14 @@
           <button type="submit">Analyser ce PGN</button>
         </form>
         <p id="pgn-status" class="status"></p>
+        <div class="import-box">
+          <label class="secondary file-btn">📂 Importer un fichier .pgn (plusieurs parties)
+            <input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn" hidden>
+          </label>
+          <p class="muted small">Sur Chess.com : <em>Parties → Archive</em>, sélectionne tes parties puis <em>Télécharger</em>.</p>
+          <p id="import-status" class="status"></p>
+          <ul id="imported-list" class="games-list"></ul>
+        </div>
       </section>
 
       <section class="settings">
@@ -89,7 +114,8 @@
         <li>Clique sur une partie : Stockfish l'analyse coup par coup, dans ton navigateur.</li>
         <li>Repère tes gaffes, erreurs et imprécisions, et découvre le meilleur coup à chaque fois.</li>
       </ol>
-      <p class="muted">Utilise les flèches ← → du clavier pour naviguer dans la partie.</p>
+      <p class="muted">Utilise les flèches ← → du clavier pour naviguer dans la partie, et joue tes propres coups sur
+        l'échiquier pour explorer une variante avec Stockfish.</p>
     </section>
   </main>
 

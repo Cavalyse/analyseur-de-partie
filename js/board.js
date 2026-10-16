@@ -112,6 +112,7 @@ export class Board {
       }
     }
     this.squares.replaceChildren(frag);
+    this.markMovable();
 
     for (const { from, to } of animate) this.animatePiece(from, to);
 
@@ -173,6 +174,15 @@ export class Board {
   enableMoves({ color, dests, onMove }) {
     this.interaction = { color, dests, onMove };
     this.el.classList.add('interactive');
+    this.markMovable();
+  }
+
+  /** Les pièces déplaçables bloquent le défilement tactile ; ailleurs, la page défile normalement. */
+  markMovable() {
+    for (const el of this.squares.querySelectorAll('.piece')) {
+      const sq = el.parentElement.dataset.square;
+      el.classList.toggle('movable', Boolean(this.interaction) && this.pieces[sq]?.[0] === this.interaction.color);
+    }
   }
 
   disableMoves() {
@@ -180,6 +190,7 @@ export class Board {
     this.select(null);
     this.cancelDrag();
     this.el.classList.remove('interactive');
+    this.markMovable();
   }
 
   /** Met en évidence une case (ex. indice). */

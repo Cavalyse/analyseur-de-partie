@@ -3,12 +3,48 @@
 
 const API = 'https://api.chess.com/pub';
 
+const NETWORK_ERROR = 'Impossible de joindre Chess.com. Vérifie ta connexion et désactive un éventuel bloqueur '
+  + 'de publicités ou de pistage pour ce site, puis réessaie dans quelques secondes.';
+const RETRIES = 3;
+
+const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/** Erreur passagère (réseau, limite de requêtes) : les parties mémorisées peuvent prendre le relais. */
+function retryableError(message) {
+  const err = new Error(message);
+  err.retryable = true;
+  return err;
+}
+
+/**
+ * Requête JSON vers l'API, avec nouvelles tentatives en cas d'échec réseau ou de limite de
+ * requêtes (429). À partir du deuxième essai, le cache du navigateur est contourné, au cas où
+ * il contiendrait une réponse inutilisable.
+ */
 async function getJson(url) {
-  const res = await fetch(url);
-  if (res.status === 404) throw new Error('Joueur introuvable sur Chess.com.');
-  if (res.status === 429) throw new Error('Trop de requêtes vers Chess.com, réessaie dans quelques secondes.');
-  if (!res.ok) throw new Error(`Erreur Chess.com (${res.status}).`);
-  return res.json();
+  let lastError = null;
+  for (let attempt = 0; attempt < RETRIES; attempt++) {
+    if (attempt) await wait(700 * attempt);
+    let res;
+    try {
+      res = await fetch(url, attempt ? { cache: 'reload' } : {});
+    } catch {
+      lastError = retryableError(NETWORK_ERROR); // « Failed to fetch » : aucune réponse lisible
+      continue;
+    }
+    if (res.status === 404) throw new Error('Joueur introuvable sur Chess.com : vérifie le pseudo.');
+    if (res.status === 429) {
+      lastError = retryableError('Chess.com limite les requêtes trop rapprochées : réessaie dans quelques secondes.');
+      continue;
+    }
+    if (!res.ok) throw new Error(`Chess.com a répondu par une erreur (${res.status}). Réessaie plus tard.`);
+    try {
+      return await res.json();
+    } catch {
+      lastError = retryableError('Réponse de Chess.com illisible. Réessaie dans quelques secondes.');
+    }
+  }
+  throw lastError;
 }
 
 /** Liste des URLs des archives mensuelles du joueur, de la plus récente à la plus ancienne. */

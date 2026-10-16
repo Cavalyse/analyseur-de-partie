@@ -44,7 +44,7 @@ export class EvalGraph {
     moves.forEach((m, i) => {
       const p = positions[i + 1];
       if (!m.classification || !p.eval) return;
-      if (['mistake', 'blunder', 'inaccuracy'].includes(m.classification)) {
+      if (['mistake', 'blunder', 'inaccuracy', 'miss'].includes(m.classification)) {
         svg += `<circle class="graph-dot ${m.classification}" cx="${x(i + 1)}" cy="${y(whiteWinPercent(p.eval))}" r="3.5"/>`;
       }
     });

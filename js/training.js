@@ -27,12 +27,12 @@ function rookMove(mv) {
   return mv.flags.includes('k') ? { from: `h${rank}`, to: `f${rank}` } : { from: `a${rank}`, to: `d${rank}` };
 }
 
-/** Exercices disponibles pour une couleur : erreurs et gaffes dont on connaît le meilleur coup. */
+/** Exercices disponibles pour une couleur : erreurs, gaffes et occasions manquées dont on connaît le meilleur coup. */
 export function findExercises(game, color) {
   const { moves, positions } = game;
   return moves
     .map((m, i) => ({ m, i }))
-    .filter(({ m, i }) => m.color === color && ['mistake', 'blunder'].includes(m.classification) && positions[i].best)
+    .filter(({ m, i }) => m.color === color && ['mistake', 'miss', 'blunder'].includes(m.classification) && positions[i].best)
     .map(({ m, i }) => ({ index: i, fen: positions[i].fen, evalBefore: positions[i].eval, best: positions[i].best, played: m }));
 }
 
